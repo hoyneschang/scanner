@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>极简手机收银扫码器</title>
+    <!-- 引入 html5-qrcode 库 -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --success-color: #28a745;
+            --bg-color: #f8f9fa;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2 { margin-bottom: 10px; color: #333; }
+
+        /* 扫码窗口样式 */
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background: #000;
+        }
+
+        /* 结果显示区域 */
+        #result-container {
+            width: 100%;
+            max-width: 500px;
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .product-name {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .product-price {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #e63946;
+            margin: 10px 0;
+        }
+
+        .product-barcode {
+            font-size: 0.9rem;
+            color: #999;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            width: 100%;
+            max-width: 500px;
+            padding: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: opacity 0.2s;
+        }
+
+        .btn-start { background-color: var(--primary-color); }
+        .btn-stop { background-color: #6c757d; display: none; }
+        
+        /* 扫码成功时的闪烁效果 */
+        .scan-success-flash {
+            animation: flash 0.5s;
+        }
+        @keyframes flash {
+            0% { background-color: transparent; }
+            50% { background-color: rgba(40, 167, 69, 0.3); }
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body>
+
+    <h2>收银扫码器</h2>
+
+    <!-- 扫码窗口 -->
+    <div id="reader"></div>
+
+    <!-- 控制按钮 -->
+    <button id="start-btn" class="btn btn-start">开启摄像头扫码</button>
+    <button id="stop-btn" class="btn btn-stop">停止扫码</button>
+
+    <!-- 显示结果 -->
+    <div id="result-container">
+        <div id="empty-msg">等待扫码...</div>
+        <div id="product-info" style="display: none;">
+            <div class="product-name" id="p-name">商品名称</div>
+            <div class="product-price" id="p-price">￥0.00</div>
+            <div class="product-barcode" id="p-barcode">条码: -</div>
+        </div>
+    </div>
+
+    <script>
+        // 1. 模拟数据库 (条形码作为 Key)
+        // 提示：你可以随便找个身边商品的条码录入进来测试
+        const productDatabase = {
+            "6901234567890": { name: "可口可乐 500ml", price: "3.50" },
+            "6923450302213": { name: "农夫山泉 550ml", price: "2.00" },
+            "9787115428028": { name: "深入浅出Node.js (图书)", price: "79.00" },
+            "6902538005141": { name: "维他奶 250ml", price: "3.20" }
+        };
+
+        let html5QrCode;
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const resultContainer = document.getElementById('result-container');
+
+        // 2. 初始化扫码器逻辑
+        function onScanSuccess(decodedText, decodedResult) {
+            // 扫码成功后的操作
+            console.log(`扫描结果: ${decodedText}`, decodedResult);
+            
+            // 界面反馈
+            resultContainer.classList.add('scan-success-flash');
+            setTimeout(() => resultContainer.classList.remove('scan-success-flash'), 500);
+
+            // 查找数据库
+            const product = productDatabase[decodedText];
+            
+            document.getElementById('empty-msg').style.display = 'none';
+            document.getElementById('product-info').style.display = 'block';
+
+            if (product) {
+                document.getElementById('p-name').innerText = product.name;
+                document.getElementById('p-price').innerText = `￥${product.price}`;
+                document.getElementById('p-barcode').innerText = `条码: ${decodedText}`;
+                // 成功扫到商品后可以根据需要决定是否停止扫码，这里保持运行
+            } else {
+                document.getElementById('p-name').innerText = "未登记商品";
+                document.getElementById('p-price').innerText = "￥--";
+                document.getElementById('p-barcode').innerText = `条码: ${decodedText}`;
+            }
+        }
+
+        // 3. 启动摄像头
+        startBtn.addEventListener('click', () => {
+            html5QrCode = new Html5Qrcode("reader");
+            
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 150 }, // 设置适合条形码的长方形框
+                aspectRatio: 1.0 
+            };
+
+            // 使用后置摄像头 (environment)
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                config, 
+                onScanSuccess
+            ).then(() => {
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'block';
+            }).catch(err => {
+                alert("无法开启摄像头，请确保已授予权限并使用 HTTPS 环境。");
+                console.error(err);
+            });
+        });
+
+        // 4. 停止摄像头
+        stopBtn.addEventListener('click', () => {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    startBtn.style.display = 'block';
+                    stopBtn.style.display = 'none';
+                });
+            }
+        });
+    </script>
+</body>
+</html>
